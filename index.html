@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud Sea</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Layout idea: the sky fills the whole frame; small glass panels sit in the corners; one card for start and pause. Single theme by choice: the game is its own world. */
+  :root {
+    color-scheme: dark;
+    --glass: rgba(16, 38, 84, 0.58);
+    --glass-line: rgba(255, 255, 255, 0.28);
+    --ink: #ffffff;
+    --soft: #cfe3ff;
+    --sun: #ffd23f;
+    --mint: #6ff0d2;
+    --card: #f7fbff;
+    --card-ink: #14305f;
+    --font-display: "Baloo 2", "Trebuchet MS", "Segoe UI", sans-serif;
+    --font-body: "Nunito", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; background: #1e6fd9; color: var(--ink); font-family: var(--font-body); font-size: 15px; overflow: hidden; }
+  #stage { position: relative; width: 100%; height: 100%; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #view { display: block; width: 100%; height: 100%; }
+  .panel { position: absolute; background: var(--glass); border: 1px solid var(--glass-line); border-radius: 12px; padding: 8px 12px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); line-height: 1.35; }
+  .panel b { font-family: var(--font-display); font-weight: 800; font-size: 19px; font-variant-numeric: tabular-nums; }
+  .panel small { color: var(--soft); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; display: block; }
+  #flight { top: 12px; left: 12px; display: flex; gap: 16px; }
+  #tally { top: 12px; right: 12px; display: flex; gap: 16px; }
+  #goals { bottom: 12px; left: 12px; max-width: min(360px, calc(100% - 24px)); display: flex; flex-direction: column; gap: 4px; font-weight: 700; }
+  #goals .g-ring::before, #goals .g-mission::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+  #goals .g-state { color: var(--soft); font-weight: 500; }
+  #goals .g-ring::before { background: var(--sun); }
+  #goals .g-mission::before { background: var(--mint); }
+  .meter { display: block; width: 92px; height: 11px; border-radius: 6px; background: rgba(255, 255, 255, 0.25); margin-top: 9px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 100%; background: var(--sun); border-radius: 6px; }
+  .meter.empty i { background: #ff6b5e; }
+  #map { position: absolute; top: 76px; right: 12px; width: 172px; height: 172px; border-radius: 50%; border: 2px solid var(--glass-line); cursor: pointer; }
+  #map.big { top: 50%; left: 50%; right: auto; width: min(520px, 78vmin); height: min(520px, 78vmin); transform: translate(-50%, -50%); }
+  #map:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+  #friends { top: 258px; right: 12px; max-width: 240px; font-weight: 700; display: flex; flex-direction: column; gap: 2px; }
+  #friends span { color: var(--soft); font-weight: 500; }
+  #b-act { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); z-index: 15; padding: 12px 22px; font: 700 17px/1 inherit; color: #fff; background: rgba(32,120,92,.92); border: 2px solid rgba(255,255,255,.55); border-radius: 26px; cursor: pointer; }
+  #b-act[hidden] { display: none; }
+  #buttons { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  button { font: inherit; font-weight: 800; color: var(--ink); background: var(--glass); border: 1px solid var(--glass-line); border-radius: 10px; padding: 8px 12px; cursor: pointer; }
+  button:hover { background: rgba(16, 38, 84, 0.8); }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--sun); outline-offset: 2px; }
+  #toast { position: absolute; top: 84px; left: 50%; transform: translateX(-50%); background: var(--card); color: var(--card-ink); font-family: var(--font-display); font-weight: 800; font-size: 20px; padding: 6px 18px; border-radius: 999px; max-width: calc(100% - 32px); text-align: center; opacity: 0; transition: opacity 0.4s; pointer-events: none; }
+  #toast.on { opacity: 1; }
+  .marker { position: absolute; left: 0; top: 0; pointer-events: none; font-weight: 800; font-size: 12px; text-shadow: 0 1px 3px rgba(0, 0, 40, 0.7); display: flex; flex-direction: column; align-items: center; gap: 2px; will-change: transform; width: 110px; white-space: nowrap; }
+  .marker i { width: 18px; height: 18px; border: 3px solid currentColor; border-radius: 50%; display: block; }
+  .marker.off i { border-radius: 0; border-width: 0 0 4px 4px; transform: rotate(var(--rot, 0deg)); width: 14px; height: 14px; }
+  #m-ring { color: var(--sun); } #m-mission { color: var(--mint); } #m-quest { color: #ffb347; }
+  #stick, #touch-btns { position: absolute; bottom: 86px; display: none; }
+  #stick { left: 24px; width: 120px; height: 120px; border-radius: 50%; border: 2px solid var(--glass-line); background: rgba(16, 38, 84, 0.3); }
+  #stick i { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, 0.75); }
+  #touch-btns { right: 16px; flex-direction: column; gap: 10px; }
+  #touch-btns button { width: 84px; height: 56px; border-radius: 28px; }
+  @media (pointer: coarse) { #stick { display: block; } #touch-btns { display: flex; } #goals { bottom: 222px; } }
+  .overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(10, 30, 80, 0.35); }
+  .card { background: var(--card); color: var(--card-ink); border-radius: 18px; padding: 20px 24px; width: 100%; max-width: 560px; max-height: 100%; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 18px 50px rgba(0, 20, 70, 0.4); }
+  .card h1 { font-family: var(--font-display); font-weight: 800; font-size: 44px; line-height: 1; margin: 0; text-wrap: balance; }
+  .card h2 { font-family: var(--font-display); font-weight: 800; font-size: 26px; margin: 0; }
+  .card p { margin: 0; max-width: 62ch; }
+  .card label { font-weight: 800; }
+  .card input[type="text"] { font: inherit; font-weight: 700; color: var(--card-ink); background: #fff; border: 2px solid #9db8e6; border-radius: 10px; padding: 7px 10px; width: 100%; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatches label { cursor: pointer; }
+  .swatches input { position: absolute; opacity: 0; }
+  .swatches span { display: block; width: 38px; height: 38px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 0 0 2px #9db8e6; }
+  .swatches input:checked + span { box-shadow: 0 0 0 4px var(--card-ink); }
+  .swatches input:focus-visible + span { outline: 3px solid var(--sun); outline-offset: 4px; }
+  .keys { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 0; }
+  .keys dt { font-weight: 800; white-space: nowrap; }
+  .keys dd { margin: 0; }
+  .card button { color: var(--card-ink); background: #e3eeff; border-color: #9db8e6; }
+  .card button.go { background: #ff7a3d; border-color: #ff7a3d; color: #fff; font-family: var(--font-display); font-size: 24px; padding: 8px 28px; align-self: flex-start; }
+  .card ol { margin: 0; padding-left: 22px; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="view" aria-label="Flying game: a small propeller plane over floating islands above a sea of clouds."></canvas>
+
+  <div class="panel" id="flight">
+    <div><small>Speed</small><b id="h-speed">0</b></div>
+    <div><small>Altitude</small><b id="h-alt">0</b></div>
+    <div><small id="h-weather">Clear</small><b id="h-clock">08:00</b></div>
+    <div><small>Boost</small><span class="meter"><i id="h-boost"></i></span></div>
+  </div>
+  <div class="panel" id="tally">
+    <div><small>Stars</small><b id="h-stars">0</b></div>
+    <div><small>Landmarks</small><b id="h-marks">0</b></div>
+  </div>
+  <canvas id="map" width="512" height="512" role="img" tabindex="0" aria-label="Map: islands, landmarks, the next ring, your mission target and friends around you. Press N or click to enlarge."></canvas>
+  <div class="panel" id="friends" hidden></div>
+  <div class="panel" id="goals">
+    <div class="g-ring" id="g-ring">Ring course 1: fly through the gold ring</div>
+    <div class="g-mission" id="g-mission">Missions begin once you take off</div>
+    <div class="g-state" id="g-state">Land on any lake or airstrip: slow down with Ctrl and touch down gently</div>
+  </div>
+  <div id="toast" role="status"></div>
+  <button id="b-act" type="button" hidden></button>
+  <div class="marker" id="m-ring"><i></i><span></span></div>
+  <div class="marker" id="m-mission"><i></i><span></span></div>
+  <div class="marker" id="m-quest"><i></i><span></span></div>
+
+  <div id="stick"><i></i></div>
+  <div id="touch-btns">
+    <button id="t-up" type="button">Faster</button>
+    <button id="t-boost" type="button">Boost</button>
+    <button id="t-slow" type="button">Slow</button>
+  </div>
+
+  <div id="buttons">
+    <button id="b-gfx" type="button">Graphics: high</button>
+    <button id="b-veh" type="button">Ride: plane</button>
+    <button id="b-sound" type="button">Sound: on</button>
+    <button id="b-log" type="button">Logbook</button>
+    <button id="b-reset" type="button">Reset (R)</button>
+    <button id="b-pause" type="button">Pause</button>
+    <button id="b-full" type="button">Fullscreen</button>
+  </div>
+
+  <div class="overlay" id="ov-start">
+    <div class="card">
+      <h1>Cloud Sea</h1>
+      <p>An endless sky of floating islands. Fly anywhere, find landmarks, thread ring courses, run missions, and share a room code with friends to fly, race and explore together.</p>
+      <div class="field">
+        <label for="nick">Your pilot name</label>
+        <input id="nick" type="text" maxlength="14" autocomplete="off" placeholder="Pilot">
+      </div>
+      <div class="field">
+        <span id="sw-label" style="font-weight:800">Plane colour</span>
+        <div class="swatches" role="radiogroup" aria-labelledby="sw-label" id="swatches"></div>
+      </div>
+      <div class="field">
+        <label for="room-code">Play together (optional)</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="room-code" type="text" maxlength="16" autocomplete="off" placeholder="Room code, e.g. KITE-42" style="flex:1;min-width:150px">
+        <button type="button" id="b-join" style="padding:8px 14px;border-radius:12px;font-weight:800;cursor:pointer">Join</button>
+        <button type="button" id="b-create" style="padding:8px 14px;border-radius:12px;font-weight:800;cursor:pointer">Create room</button></div>
+        <span id="room-status" style="font-weight:700;color:#1d7a4f"></span>
+      </div>
+      <dl class="keys">
+        <dt>Steer</dt><dd>Move the mouse, or use WASD / arrow keys. Up climbs.</dd>
+        <dt>Land</dt><dd>Hold Ctrl to slow right down, then touch a lake or airstrip gently. Shift and pull up to take off again.</dd>
+        <dt>Speed</dt><dd>Shift faster, Ctrl slower, Space boost. Boost drains its meter and refills when you let go; rings top it up.</dd>
+        <dt>Phone</dt><dd>Left stick steers; Faster, Boost and Slow buttons on the right. On foot they become Wave, Run and Jump.</dd>
+        <dt>Gamepad</dt><dd>Left stick steers, right trigger faster, left trigger slower, A boost</dd>
+        <dt>Friends</dt><dd>In a room: 1 to 5 (or the Say button) send quick messages, G pings the map, Race starts a countdown for everyone, and every few minutes a shared hunt for eight gold balloons begins.</dd>
+        <dt>Dragon</dt><dd>The Ride button swaps your plane for a dragon.</dd>
+        <dt>Villagers</dt><dd>Land by an airstrip, walk to a villager and press F to take an errand. Errands unlock hats in the Pause menu.</dd>
+        <dt>On foot</dt><dd>F gets out or in. W/S walk, A/D turn, Shift run, Space jump, Q wave.</dd>
+        <dt>Other</dt><dd>N opens the big map, T skips time ahead, M mutes, P pauses. If it stutters, set Graphics to light.</dd>
+      </dl>
+      <button class="go" id="b-start" type="button">Take off</button>
+    </div>
+  </div>
+
+  <div class="overlay" id="ov-pause" hidden>
+    <div class="card">
+      <h2 id="pause-title">Paused</h2>
+      <div id="pause-body"></div>
+      <button class="go" id="b-resume" type="button">Keep flying</button>
+    </div>
+  </div>
+</div>
+
+<script src="three-bundle.js"></script>
+
+<script src="plane-model.js"></script>
+<script src="tree-models.js"></script>
+<script src="pilot-model.js"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  if (!window.THREE) {
+    $("ov-start").querySelector(".card").innerHTML = "<h1>Cloud Sea</h1><p>The 3D engine did not load. Check your connection and reload the page.</p>";
+    return;
+  }
+  var gl = null;
+  try { var probe = document.createElement("canvas"); gl = probe.getContext("webgl") || probe.getContext("experimental-webgl"); } catch (e) { gl = null; }
+  if (!gl) {
+    $("ov-start").querySelector(".card").innerHTML = "<h1>Cloud Sea</h1><p>This browser could not start 3D graphics (WebGL). Try another browser or device.</p>";
+    return;
+  }
+  var files = ['core', 'world', 'geometry', 'terrain', 'forest', 'scene', 'planes', 'render', 'fauna', 'state', 'gameplay', 'sky', 'audio', 'input', 'flight', 'foot', 'activities', 'quests', 'net', 'race', 'ui', 'main'];
+  files.forEach(function (f) { var s = document.createElement("script"); s.src = "js/" + f + ".js"; s.async = false; document.body.appendChild(s); });
+})();
+</script>
+</body>
+</html>
